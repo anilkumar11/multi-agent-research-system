@@ -13,7 +13,7 @@ The design intentionally demonstrates four things the rubric cares about:
 
 ```text
                          ┌──────────────────────────────┐
-User question ──────────>│ Planner / Orchestrator      │
+User question ──────────>│ Planner / Orchestrator       │
                          │ chooses execution strategy   │
                          └──────────────┬───────────────┘
                                         │
@@ -21,10 +21,10 @@ User question ──────────>│ Planner / Orchestrator      │
               │                         │                         │
               ▼                         ▼                         ▼
        PARALLEL SPEED            SEQUENTIAL DEPTH           HYBRID DEFAULT
-    ┌─────────────────┐       Web -> Data -> Trend       Web ──┐
+    ┌─────────────────┐       Web -> Data -> Trend      Web ──┐
     │ Web   Data      │       -> Competitive                  ├─> Trend ──┐
-    │ Trend Competitive│                                     │           ├─>
-    └───────┬─────────┘                                  Data ─┘  Comp ───┘
+    │ Trend Competitive│                                      │           ├─>
+    └───────┬─────────┘                                 Data ─┘   Comp ───┘
             └───────────────────────┬─────────────────────────────┘
                                     ▼
                          Cross-Agent Insight Builder
