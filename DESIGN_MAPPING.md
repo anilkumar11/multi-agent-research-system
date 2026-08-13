@@ -5,12 +5,12 @@
 | Shared Research Context | `ResearchState.evidence`, `question`, `execution_plan` |
 | Agent Contributions | `ResearchState.contributions` |
 | Cross-Agent Insights | `ResearchState.cross_agent_insights`, `build_cross_agent_insights()` |
-| Collaborative Reasoning | `cross_agent_insights` + provenance lineage + downstream context |
+| Collaborative Reasoning | `cross_agent_insights` + provenance lineage + downstream context (named explicitly in `README.md`'s "Collaborative Reasoning" section) |
 | Synthesis Threads | `ResearchState.synthesis_threads` |
-| Agent coordination | `graph.py` parallel, sequential, hybrid graph branches |
+| Agent coordination | `graph.py` parallel, sequential, hybrid graph branches; see `README.md`'s "Agent Coordination Matrix" for the per-node depends-on/contributes/activation/signals breakdown |
 | Inputs from other agents | Each specialist reads `state["evidence"]` |
 | Agent signaling | Reducer-backed evidence/contribution lists |
-| Dynamic activation | `planner.choose_execution_plan()` |
+| Dynamic activation | `planner.choose_execution_plan()` (parallel/sequential/hybrid pattern) + `planner.choose_active_agents()` (which of the four specialists actually run, per question) |
 | Parallel vs sequential | Three explicit graph strategies |
 | Additional investigation | HITL `more_research` routes back to planner |
 | Synthesis stop criteria | `quality.quality_gate_node()` |

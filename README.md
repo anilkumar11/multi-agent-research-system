@@ -51,6 +51,36 @@ User question ──────────>│ Planner / Orchestrator      │
 
 ---
 
+## Agent Coordination Matrix
+
+How each node depends on, contributes to, and signals other nodes:
+
+| Node | Depends on (reads) | Contributes (writes) | Activation | Signals findings via |
+|---|---|---|---|---|
+| Web Research | `question` only — always the first mover, so it never has upstream evidence to build on | `evidence` (policy/consumer-sentiment claims), `contributions` | Always active (foundational baseline research) | New `evidence` items appended to shared state; other agents pick them up as `context` |
+| Data Analysis | `question` + upstream `evidence` (in sequential/hybrid, this includes Web Research's output) | `evidence` (dataset/market-size claims), `contributions` | Always active (foundational quantitative grounding) | `evidence` tagged `market_size`/`charging`/`growth`, which the conflict resolver and insight builder specifically key off |
+| Trend Analysis | `question` + upstream `evidence` (sequential/hybrid: Web + Data's output) | `evidence` (forecast claims), `contributions` | **Conditional** — `planner.choose_active_agents()` excludes it only if the question explicitly signals trend/forecast is out of scope | Forecast-tagged `evidence`; a skipped run still emits a `contributions` record explaining why |
+| Competitive Intelligence | `question` + upstream `evidence` (sequential/hybrid: all prior specialists) | `evidence` (competitor claims), `contributions` | **Conditional** — excluded only if the question explicitly signals competitor analysis is out of scope | Competitor-tagged `evidence`; same skip-with-explanation behavior |
+| Cross-Agent Insight Builder | The full `evidence` list, across all agents that ran | `cross_agent_insights`, `synthesis_threads` | Always runs once specialists converge (parallel fan-in, sequential chain-end, or hybrid stage 2) | An insight is only emitted if it draws from `evidence` produced by **≥2 distinct** `produced_by` agents — enforced in code, not just claimed |
+| Conflict Resolver | The full `evidence` list | `conflicts` | Always runs, same convergence point as the insight builder | `conflicts[].status` (`resolved` vs `open`) signals the quality gate and, if still `open`, the human reviewer |
+| Quality Gate | `evidence`, `cross_agent_insights`, `conflicts`, `iteration_count` | `quality_gate`, `research_complete` | Always runs after conflict resolution | `quality_gate.failures` names exactly which criterion blocked synthesis |
+| Human Review | `quality_gate`, open `conflicts` | `human_decisions`, (optionally) revised `conflicts` | Triggered when the gate fails, or `mandatory_human_review` is set | LangGraph `interrupt()` payload *is* the signal — a JSON packet, not a side channel |
+| Synthesis | Everything accumulated so far | `final_report` | Triggered once the gate passes (directly, or via human `approve`/`resolve`) | The final markdown report, with every claim traceable back through `parent_evidence_ids` |
+
+This table is what "for each node, define what it needs from others, how it contributes, what triggers it, and how it signals findings" cashes out to in code — the columns map directly onto those four questions.
+
+## Collaborative Reasoning
+
+Beyond raw data sharing, three mechanisms produce genuine *shared understanding that emerges from agent interactions*:
+
+1. **Context propagation.** In sequential and hybrid modes, each specialist receives the full accumulated `evidence` list as `context` before it runs (`agents.py`'s `specialist_node`), and `AgentContribution.reasoning_note` records how that context shaped its output (e.g. `provider.py`: *"data_analysis used 2 existing evidence items"*). This is reasoning that's visibly conditioned on other agents' work, not agents reasoning in isolation and merging afterward.
+2. **Emergent insight synthesis.** `build_cross_agent_insights()` doesn't just concatenate findings — it requires evidence from ≥2 distinct agents to even produce a `CrossAgentInsight`, and its `why_emergent` field states the specific relationship that no single specialist's evidence shows alone (see the Emergent Insights example below).
+3. **Conflict-aware convergence.** `detect_and_resolve_conflicts()` reconciles disagreeing agents' claims *before* synthesis, so the final "shared understanding" reflects a resolved (or explicitly flagged-as-unresolved) position rather than silently picking whichever agent ran last.
+
+`DESIGN_MAPPING.md` maps this term to code precisely: `cross_agent_insights` + provenance lineage + downstream context.
+
+---
+
 ## 1. Trade-offs: Parallel Speed vs Sequential Depth
 
 The system does **not** assume one execution pattern is always best.
@@ -118,6 +148,12 @@ This preserves much of the latency benefit while ensuring downstream interpretat
 | Explicit "why/causal/quantify/forecast/impact" wording | Hybrid or Sequential | Later reasoning depends on earlier evidence |
 
 The chosen mode is written into `state["execution_plan"]`, so the decision is observable and auditable.
+
+### Selective agent activation
+
+The mode decision above (parallel/sequential/hybrid) governs *how* the four specialists run — it does not decide *which* specialists run, since every mode above always activates all four. That's a separate decision: `planner.choose_active_agents()` writes `state["execution_plan"]["active_agents"]`, and `web_research`/`data_analysis` are foundational (always active), while `trend_analysis`/`competitive_intelligence` are excluded only when the question explicitly signals that lens is out of scope (e.g. *"give me a market overview, excluding competitor analysis"*). An excluded specialist's node still runs (for topology simplicity — see `graph.py`) but returns immediately with a "Skipped: ..." contribution and makes no `provider.research()` call, so on the live path a skipped agent makes zero API calls.
+
+This is deliberately conservative — opt-out on an explicit signal, not opt-in on a topic keyword — rather than a fully dynamic "infer relevance from the question" activator: an LLM-based relevance classifier could infer this more generally, but risks silently starving the quality gate (fewer active agents means less evidence and fewer source types) or diverging from the demo path's deterministic fixtures. The explicit-signal approach is auditable, testable without network calls, and never changes behavior for a question that doesn't ask for narrower scope.
 
 ---
 

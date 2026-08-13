@@ -1,5 +1,38 @@
 from __future__ import annotations
 
+ALL_SPECIALTIES = ("web_research", "data_analysis", "trend_analysis", "competitive_intelligence")
+
+# web_research and data_analysis are foundational (baseline sourcing + quantitative
+# grounding) and are never excluded. trend_analysis and competitive_intelligence are
+# opt-out only, via an explicit signal that the lens is out of scope -- this keeps the
+# no-signal default identical to running all four specialists, so existing behavior is
+# unaffected unless the question actually says so.
+EXCLUSION_TERMS = {
+    "trend_analysis": (
+        "no trend", "not trend", "excluding trend", "exclude trend",
+        "ignore trend", "skip trend", "without forecast", "no forecast",
+    ),
+    "competitive_intelligence": (
+        "no competitor", "not competitor", "excluding competitor", "exclude competitor",
+        "ignore competitor", "skip competitive", "without competitive", "no competitive",
+    ),
+}
+
+
+def choose_active_agents(question: str) -> list[str]:
+    """
+    Explicit "which agents activate" decision, separate from the parallel/sequential/
+    hybrid coordination-pattern decision. Deliberately conservative (opt-out on an
+    explicit signal, not opt-in on a topic keyword) so it can't silently starve the
+    quality gate or regress an existing broad question.
+    """
+    q = question.lower()
+    active = list(ALL_SPECIALTIES)
+    for specialty, exclusion_terms in EXCLUSION_TERMS.items():
+        if any(term in q for term in exclusion_terms):
+            active.remove(specialty)
+    return active
+
 
 def choose_execution_plan(question: str) -> dict:
     """
@@ -57,6 +90,7 @@ def choose_execution_plan(question: str) -> dict:
         "dependency_score": dependency_score,
         "speed_priority": speed_priority,
         "stages": stages,
+        "active_agents": choose_active_agents(question),
         "breadth_score": breadth,
     }
 

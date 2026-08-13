@@ -88,6 +88,7 @@ class ExecutionPlan(TypedDict):
     dependency_score: int
     speed_priority: int
     stages: list[list[str]]
+    active_agents: list[str]
 
 
 class ResearchState(TypedDict, total=False):

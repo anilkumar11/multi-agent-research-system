@@ -9,6 +9,23 @@ from .utils import average, stable_id, unique_agents_for_evidence
 
 def specialist_node(provider: ResearchProvider, specialty: str) -> Callable:
     def node(state: dict) -> dict:
+        active_agents = state.get("execution_plan", {}).get("active_agents")
+        if active_agents is not None and specialty not in active_agents:
+            # planner.choose_active_agents() excluded this specialty for this
+            # question -- record it as a conscious skip (visible in the report's
+            # "Specialist contributions" section) without calling the provider,
+            # so a skipped agent costs nothing on the live path either.
+            return {
+                "contributions": [{
+                    "agent": specialty,
+                    "summary": "Skipped: the planner determined this specialty is not relevant to the question.",
+                    "evidence_ids": [],
+                    "depends_on_agents": [],
+                    "reasoning_note": "Excluded by choose_active_agents() based on the question's phrasing.",
+                }],
+                "_telemetry_note": f"{specialty}: skipped (excluded by planner, no provider call made).",
+            }
+
         context = state.get("evidence", [])
         result = provider.research(specialty, state["question"], context)
         return {

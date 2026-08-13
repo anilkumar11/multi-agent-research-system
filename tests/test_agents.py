@@ -1,6 +1,10 @@
 import unittest
 
-from research_system.agents import build_cross_agent_insights, detect_and_resolve_conflicts
+from research_system.agents import (
+    build_cross_agent_insights,
+    detect_and_resolve_conflicts,
+    specialist_node,
+)
 
 
 def _evidence(evidence_id, produced_by, claim, confidence, credibility, tags):
@@ -16,6 +20,59 @@ def _evidence(evidence_id, produced_by, claim, confidence, credibility, tags):
         "tags": tags,
         "credibility": credibility,
     }
+
+
+class FakeProvider:
+    def __init__(self):
+        self.calls = []
+
+    def research(self, specialty, question, context):
+        self.calls.append(specialty)
+        return {
+            "evidence": [_evidence("e1", specialty, "some claim", 0.8, 0.8, [])],
+            "contribution": {
+                "agent": specialty,
+                "summary": "did research",
+                "evidence_ids": ["e1"],
+                "depends_on_agents": [],
+                "reasoning_note": "",
+            },
+        }
+
+
+class SpecialistNodeActivationTests(unittest.TestCase):
+    def test_runs_provider_when_specialty_is_active(self):
+        provider = FakeProvider()
+        node = specialist_node(provider, "web_research")
+        state = {
+            "question": "q",
+            "evidence": [],
+            "execution_plan": {"active_agents": ["web_research", "data_analysis"]},
+        }
+        result = node(state)
+        self.assertEqual(provider.calls, ["web_research"])
+        self.assertEqual(len(result["evidence"]), 1)
+
+    def test_skips_provider_when_specialty_excluded(self):
+        provider = FakeProvider()
+        node = specialist_node(provider, "competitive_intelligence")
+        state = {
+            "question": "q",
+            "evidence": [],
+            "execution_plan": {"active_agents": ["web_research", "data_analysis"]},
+        }
+        result = node(state)
+        self.assertEqual(provider.calls, [])
+        self.assertEqual(result.get("evidence", []), [])
+        self.assertEqual(len(result["contributions"]), 1)
+        self.assertEqual(result["contributions"][0]["agent"], "competitive_intelligence")
+
+    def test_runs_provider_when_no_active_agents_key(self):
+        provider = FakeProvider()
+        node = specialist_node(provider, "trend_analysis")
+        state = {"question": "q", "evidence": [], "execution_plan": {}}
+        result = node(state)
+        self.assertEqual(provider.calls, ["trend_analysis"])
 
 
 class HardcodedCrossAgentInsightsTests(unittest.TestCase):
