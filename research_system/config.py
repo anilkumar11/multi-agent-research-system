@@ -30,4 +30,5 @@ def build_default_graph(checkpointer=None):
 
     llm = ChatDeepSeek(model="deepseek-chat")
     provider = LiveResearchProvider(llm)
+    print("Using live DeepSeek/Tavily provider - this will make billed API calls.")
     return build_graph(provider=provider, llm=llm, checkpointer=checkpointer)

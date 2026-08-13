@@ -319,24 +319,28 @@ pip install -r requirements.txt
 ### Interactive demo
 
 ```bash
-python run_demo.py \
-  "Should an automaker enter the Indian EV market, and what competitive position should it take?"
+python run_demo.py
 ```
+
+Then type the question at the "Research question (or 'quit'):" prompt. For example: "Should an automaker enter the Indian EV market, and what competitive position should it take?"
 
 The demo intentionally uses a deterministic local research provider so the architecture can run without API keys or paid services.
 
 For a quick-scan question:
 
 ```bash
-python run_demo.py "Quick overview and landscape scan of the Indian EV market"
+python run_demo.py
 ```
+
+Then type the quick-scan question at the prompt: "Quick overview and landscape scan of the Indian EV market"
 
 For sequential depth:
 
 ```bash
-python run_demo.py \
-  "First quantify battery-price changes, then forecast their impact on EV adoption, then determine which competitor benefits most"
+python run_demo.py
 ```
+
+Then type the sequential-depth question at the prompt: "First quantify battery-price changes, then forecast their impact on EV adoption, then determine which competitor benefits most"
 
 ### Human review response
 
@@ -362,4 +366,4 @@ python -m unittest discover -s tests -v
 
 ## Important implementation note
 
-This repository is an **architecture demonstration**, not a production web crawler. `DemoResearchProvider` supplies deterministic evidence so coordination, provenance, conflicts, HITL, telemetry, and orchestration can be evaluated without external APIs. Replace it with a real search/LLM/data provider behind the `ResearchProvider` protocol without changing the graph design.
+This repository is an **architecture demonstration**, not a production web crawler. `DemoResearchProvider` supplies deterministic evidence so coordination, provenance, conflicts, HITL, telemetry, and orchestration can be evaluated without external APIs. A real implementation, `LiveResearchProvider` (`research_system/live_provider.py`), now exists behind the same `ResearchProvider` protocol — it uses live Tavily search plus `ChatDeepSeek` structured output, and is used automatically when `DEEPSEEK_API_KEY`/`TAVILY_API_KEY` are set (see `CLAUDE.md` for details). The graph design itself never had to change.

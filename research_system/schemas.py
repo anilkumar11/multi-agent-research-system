@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -22,7 +24,7 @@ class SpecialistFindingsSchema(BaseModel):
 class ConflictCandidateSchema(BaseModel):
     issue: str = Field(description="Plain-language description of the disagreement.")
     evidence_ids: list[str] = Field(description="At least two evidence_id values whose claims disagree.")
-    severity: str = Field(description="One of: low, medium, high.")
+    severity: Literal["low", "medium", "high"] = Field(description="One of: low, medium, high.")
 
 
 class ConflictAnalysisSchema(BaseModel):

@@ -110,17 +110,17 @@ def main():
     while True:
         try:
             question = input("\nResearch question (or 'quit'): ").strip()
+
+            if not question:
+                continue
+            if question.lower() in ("quit", "exit"):
+                print("Exiting.")
+                break
+
+            run_one_question(graph, question)
         except (EOFError, KeyboardInterrupt):
             print("\nExiting.")
             break
-
-        if not question:
-            continue
-        if question.lower() in ("quit", "exit"):
-            print("Exiting.")
-            break
-
-        run_one_question(graph, question)
 
 
 if __name__ == "__main__":

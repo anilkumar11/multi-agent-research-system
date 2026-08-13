@@ -247,7 +247,7 @@ def _resolve_conflict_candidate(evidence_by_id: dict, candidate) -> dict | None:
 
     evidence_ids = [e["evidence_id"] for e in items]
     conflict_id = stable_id("conflict", candidate.issue, *evidence_ids)
-    severity = candidate.severity if candidate.severity in ("low", "medium", "high") else "medium"
+    severity = candidate.severity
 
     if can_auto_resolve:
         chosen = max(items, key=lambda e: (e["credibility"], e["confidence"]))
