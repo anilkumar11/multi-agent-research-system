@@ -1,6 +1,6 @@
 # Multi-Agent Research System (LangGraph)
 
-A runnable reference implementation for the Coursera **Designing a Multi-Agent Research System** assignment.
+A runnable reference implementation for a **Designing a Multi-Agent Research System** assignment.
 
 The design intentionally demonstrates four things the rubric cares about:
 
