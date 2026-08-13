@@ -22,6 +22,11 @@ cp .env.example .env   # then fill in DEEPSEEK_API_KEY / TAVILY_API_KEY / LANGSM
 # Run the interactive CLI (prompts for a research question; 'quit' to exit)
 python run_demo.py
 
+# Run the batch eval (autonomous quality-gate pass rate across a question set)
+python run_eval.py                    # offline demo provider, default 5-question set, free
+python run_eval.py --live             # live provider if configured (bills API calls)
+python run_eval.py "custom question"  # override the question set
+
 # Run all tests
 python -m unittest discover -s tests -v
 
@@ -36,6 +41,15 @@ test the system. With `DEEPSEEK_API_KEY` and `TAVILY_API_KEY` set, it uses
 `LiveResearchProvider` (real Tavily search + `ChatDeepSeek` structured-output calls)
 instead. `LANGSMITH_*` vars (see `.env.example`) enable tracing automatically with no
 code changes — `langchain-core` picks them up from the environment.
+
+`run_eval.py` runs a fixed (or custom) question set through the graph and reports the
+**autonomous quality-gate pass rate**: the fraction of questions where `quality_gate.passed`
+was `True` on the first pass, with no human review needed. Any question that pauses for HITL
+is auto-approved (so the run still completes and the summary reflects true end-to-end
+behavior) but counted as not-autonomous. This is the only "success rate" the system
+currently reports anywhere — there is no LangSmith Evaluations pipeline wired up (only
+passive tracing via `LANGSMITH_TRACING`, which shows individual run traces, not an
+aggregate pass-rate metric).
 
 When the graph pauses for human review, it prints a JSON review packet and expects one of
 `approve`, `more`, or `resolve` on stdin. `resolve` auto-picks the strongest evidence by
