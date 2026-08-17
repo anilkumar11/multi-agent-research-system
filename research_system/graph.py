@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.store.memory import InMemoryStore
 
 from .agents import (
     build_cross_agent_insights,
@@ -9,7 +10,7 @@ from .agents import (
     specialist_node,
 )
 from .hitl import human_review_node, route_after_human
-from .planner import planner_node
+from .planner import build_planner_node
 from .provider import DemoResearchProvider, ResearchProvider
 from .quality import quality_gate_node, route_after_quality_gate
 from .state import ResearchState
@@ -29,13 +30,15 @@ def build_graph(
     provider: ResearchProvider | None = None,
     checkpointer=None,
     llm=None,
+    store=None,
 ):
     provider = provider or DemoResearchProvider()
     checkpointer = checkpointer or InMemorySaver()
+    store = store or InMemoryStore()
 
     builder = StateGraph(ResearchState)
 
-    builder.add_node("planner", timed_node("planner", planner_node))
+    builder.add_node("planner", timed_node("planner", build_planner_node(store)))
 
     # Strategy/barrier nodes.
     builder.add_node("parallel_start", timed_node("parallel_start", _noop))
@@ -145,4 +148,4 @@ def build_graph(
     )
     builder.add_edge("synthesis", END)
 
-    return builder.compile(checkpointer=checkpointer)
+    return builder.compile(checkpointer=checkpointer, store=store)
