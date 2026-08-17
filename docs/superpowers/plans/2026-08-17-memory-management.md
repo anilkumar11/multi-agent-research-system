@@ -2288,16 +2288,7 @@ Expected: PASS, no regressions.
 
 - [ ] **Step 8: Manual verification — real durability, offline, free**
 
-Run:
-```bash
-rm -rf /tmp/memory-durability-check && mkdir -p /tmp/memory-durability-check
-cd /tmp/memory-durability-check
-python3 -c "
-import sys
-sys.path.insert(0, '$(python3 -c "import os; print(os.getcwd())" )')
-"
-```
-Simpler: from the repo root, run
+Run, from the repo root:
 ```bash
 DEEPSEEK_API_KEY= TAVILY_API_KEY= python3 -c "
 from research_system.config import build_default_graph, CHECKPOINT_PATH, STORE_PATH
