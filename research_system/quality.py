@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .memory.procedural import load_rules
 from .utils import average, unique_source_types
 
 
@@ -16,6 +17,12 @@ def quality_gate_node(state: dict) -> dict:
     conflicts = state.get("conflicts", [])
     iteration_count = state.get("iteration_count", 0)
 
+    rules = load_rules()["quality_gate"]
+    min_evidence = rules.get("min_evidence", MIN_EVIDENCE)
+    min_source_types = rules.get("min_source_types", MIN_SOURCE_TYPES)
+    min_avg_confidence = rules.get("min_avg_confidence", MIN_AVG_CONFIDENCE)
+    min_cross_agent_insights = rules.get("min_cross_agent_insights", MIN_CROSS_AGENT_INSIGHTS)
+
     unresolved_high = [
         c for c in conflicts
         if c["severity"] == "high" and c["status"] == "open"
@@ -24,14 +31,14 @@ def quality_gate_node(state: dict) -> dict:
     source_types = unique_source_types(evidence)
 
     failures = []
-    if len(evidence) < MIN_EVIDENCE:
-        failures.append(f"evidence_count<{MIN_EVIDENCE}")
-    if len(source_types) < MIN_SOURCE_TYPES:
-        failures.append(f"source_type_count<{MIN_SOURCE_TYPES}")
-    if avg_conf < MIN_AVG_CONFIDENCE:
-        failures.append(f"average_confidence<{MIN_AVG_CONFIDENCE}")
-    if len(insights) < MIN_CROSS_AGENT_INSIGHTS:
-        failures.append(f"cross_agent_insights<{MIN_CROSS_AGENT_INSIGHTS}")
+    if len(evidence) < min_evidence:
+        failures.append(f"evidence_count<{min_evidence}")
+    if len(source_types) < min_source_types:
+        failures.append(f"source_type_count<{min_source_types}")
+    if avg_conf < min_avg_confidence:
+        failures.append(f"average_confidence<{min_avg_confidence}")
+    if len(insights) < min_cross_agent_insights:
+        failures.append(f"cross_agent_insights<{min_cross_agent_insights}")
     if unresolved_high:
         failures.append("unresolved_high_conflicts>0")
     if iteration_count > MAX_ITERATIONS:

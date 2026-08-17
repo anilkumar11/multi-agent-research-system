@@ -42,5 +42,18 @@ class QualityGateTests(unittest.TestCase):
         )
 
 
+class QualityGateProceduralDefaultsTests(unittest.TestCase):
+    def test_default_rules_match_hardcoded_constants(self):
+        # Regression guard: with no override file present, load_rules() must
+        # return exactly the original hardcoded thresholds -- this is what
+        # keeps QualityGateTests above passing unchanged.
+        from research_system.memory.procedural import load_rules
+        rules = load_rules()["quality_gate"]
+        self.assertEqual(rules["min_evidence"], 4)
+        self.assertEqual(rules["min_source_types"], 2)
+        self.assertEqual(rules["min_avg_confidence"], 0.70)
+        self.assertEqual(rules["min_cross_agent_insights"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()
