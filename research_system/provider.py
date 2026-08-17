@@ -6,7 +6,9 @@ from .utils import stable_id, utc_now
 
 
 class ResearchProvider(Protocol):
-    def research(self, specialty: str, question: str, context: list[dict]) -> dict:
+    def research(
+        self, specialty: str, question: str, context: list[dict], memory: dict | None = None
+    ) -> dict:
         """Return a contribution and evidence for one specialist."""
         ...
 
@@ -43,7 +45,9 @@ class DemoResearchProvider:
             "credibility": credibility,
         }
 
-    def research(self, specialty: str, question: str, context: list[dict]) -> dict:
+    def research(
+        self, specialty: str, question: str, context: list[dict], memory: dict | None = None
+    ) -> dict:
         parent_ids = [e["evidence_id"] for e in context[-3:]]
 
         if specialty == "web_research":
@@ -149,6 +153,8 @@ class DemoResearchProvider:
         else:
             raise ValueError(f"Unknown specialty: {specialty}")
 
+        summary = self._augment_summary_with_memory(summary, memory)
+
         return {
             "evidence": evidence,
             "contribution": {
@@ -162,3 +168,28 @@ class DemoResearchProvider:
                 ),
             },
         }
+
+    @staticmethod
+    def _augment_summary_with_memory(summary: str, memory: dict | None) -> str:
+        """
+        Demo evidence never varies by question, so memory can't change WHAT
+        this provider finds -- but it appends a visible note when relevant
+        memory exists, so the mechanism is genuinely exercised and observable
+        even on the offline path.
+        """
+        if not memory:
+            return summary
+
+        notes = []
+        facts = memory.get("semantic_facts") or []
+        if facts:
+            patterns = sorted({f.get("pattern", "fact") for f in facts})
+            notes.append(f"{len(facts)} known fact(s) on this topic ({', '.join(patterns)})")
+
+        episodes = memory.get("relevant_episodes") or []
+        if episodes:
+            notes.append(f"{len(episodes)} prior run(s) on this topic")
+
+        if not notes:
+            return summary
+        return f"{summary} Related memory: {'; '.join(notes)}."

@@ -27,7 +27,8 @@ def specialist_node(provider: ResearchProvider, specialty: str) -> Callable:
             }
 
         context = state.get("evidence", [])
-        result = provider.research(specialty, state["question"], context)
+        memory_context = state.get("memory_context")
+        result = provider.research(specialty, state["question"], context, memory=memory_context)
         return {
             "evidence": result["evidence"],
             "contributions": [result["contribution"]],

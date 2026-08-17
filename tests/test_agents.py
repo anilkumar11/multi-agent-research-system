@@ -25,9 +25,11 @@ def _evidence(evidence_id, produced_by, claim, confidence, credibility, tags):
 class FakeProvider:
     def __init__(self):
         self.calls = []
+        self.received_memory = []
 
-    def research(self, specialty, question, context):
+    def research(self, specialty, question, context, memory=None):
         self.calls.append(specialty)
+        self.received_memory.append(memory)
         return {
             "evidence": [_evidence("e1", specialty, "some claim", 0.8, 0.8, [])],
             "contribution": {
@@ -73,6 +75,26 @@ class SpecialistNodeActivationTests(unittest.TestCase):
         state = {"question": "q", "evidence": [], "execution_plan": {}}
         result = node(state)
         self.assertEqual(provider.calls, ["trend_analysis"])
+
+    def test_passes_memory_context_through_to_provider(self):
+        provider = FakeProvider()
+        node = specialist_node(provider, "web_research")
+        memory_context = {"topic": "ev_indian_market", "semantic_facts": [{"x": 1}], "relevant_episodes": []}
+        state = {
+            "question": "q",
+            "evidence": [],
+            "execution_plan": {"active_agents": ["web_research"]},
+            "memory_context": memory_context,
+        }
+        node(state)
+        self.assertEqual(provider.received_memory, [memory_context])
+
+    def test_memory_is_none_when_state_has_no_memory_context(self):
+        provider = FakeProvider()
+        node = specialist_node(provider, "web_research")
+        state = {"question": "q", "evidence": [], "execution_plan": {"active_agents": ["web_research"]}}
+        node(state)
+        self.assertEqual(provider.received_memory, [None])
 
 
 class HardcodedCrossAgentInsightsTests(unittest.TestCase):
