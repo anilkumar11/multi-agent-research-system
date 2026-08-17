@@ -434,3 +434,16 @@ time — a genuine "the system learned from experience" moment, not simulated.
 See `CLAUDE.md`'s "Memory management" section for the full architecture and
 the capture → analyze-and-refine → store-and-version → apply-and-consolidate
 loop mapped to code.
+
+### Inspecting memory
+
+```bash
+python inspect_memory.py                        # list every topic on record + procedural rules
+python inspect_memory.py "Indian EV market"      # episodes + semantic facts for one topic
+python inspect_memory.py ev_indian_market --raw  # same, as raw JSON
+```
+
+Read-only — safe to run any time, including mid-session. Long-term memory
+itself lives in `.research_memory/store.json` (gitignored, accumulates
+locally); `research_system/memory/procedural_rules.json` is the only piece
+that's committed, since it's versioned config rather than accumulated data.
