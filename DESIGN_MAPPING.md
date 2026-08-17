@@ -18,5 +18,9 @@
 | Conflict resolution | `detect_and_resolve_conflicts()` + first-class `Conflict` state |
 | Human-in-the-loop | `human_review_node()` + LangGraph `interrupt()` |
 | Checkpoints | `InMemorySaver` in demo; replace with durable saver in production |
+| Short-term memory durability | `SqliteSaver` via `config.py`'s `_durable_checkpointer()` |
+| Semantic long-term memory | `research_system/memory/semantic.py` |
+| Episodic long-term memory | `research_system/memory/episodic.py` |
+| Procedural long-term memory | `research_system/memory/procedural.py` + `procedural_rules.json`, versioned via this repo's git history |
 | Telemetry | `timed_node()` + append-only telemetry state |
 | Emergent intelligence | Insight requires evidence from >=2 specialist agents |

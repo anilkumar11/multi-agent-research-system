@@ -403,3 +403,34 @@ python -m unittest discover -s tests -v
 ## Important implementation note
 
 This repository is an **architecture demonstration**, not a production web crawler. `DemoResearchProvider` supplies deterministic evidence so coordination, provenance, conflicts, HITL, telemetry, and orchestration can be evaluated without external APIs. A real implementation, `LiveResearchProvider` (`research_system/live_provider.py`), now exists behind the same `ResearchProvider` protocol — it uses live Tavily search plus `ChatDeepSeek` structured output, and is used automatically when `DEEPSEEK_API_KEY`/`TAVILY_API_KEY` are set (see `CLAUDE.md` for details). The graph design itself never had to change.
+
+---
+
+## 8. Memory Management
+
+Beyond a single research session's shared state (section 1 above), the system
+distinguishes **short-term** (one research thread) from **long-term**
+(cross-session) memory, split into the three standard long-term sub-types:
+
+- **Semantic** — durable facts about a topic (e.g. "this topic's quality gate
+  has failed on `unresolved_high_conflicts>0` in 2 of its last 3 runs").
+- **Episodic** — a log of past runs on a topic (question, mode, whether the
+  gate passed, whether HITL was needed).
+- **Procedural** — versioned operational rules (quality-gate thresholds,
+  per-topic `mandatory_human_review` overrides) that actually govern runtime
+  behavior, analogous to an `AGENTS.md` bundle. Versioning is this repo's own
+  git history, not an external product.
+
+Memory is namespaced by **topic**, a keyword heuristic derived from the
+question text (`research_system/memory/topic.py`) — not a real topic model,
+documented as a known limitation there.
+
+Example of the loop actually mattering: ask the same (or similarly-phrased)
+question on the offline demo provider three times in a row, and by the third
+run `reflect_on_topic()` will propose forcing human review by default for that
+topic going forward, because the same quality-gate failure recurred every
+time — a genuine "the system learned from experience" moment, not simulated.
+
+See `CLAUDE.md`'s "Memory management" section for the full architecture and
+the capture → analyze-and-refine → store-and-version → apply-and-consolidate
+loop mapped to code.

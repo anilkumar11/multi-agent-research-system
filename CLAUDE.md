@@ -108,3 +108,62 @@ gate's `evidence_count`/conflict counts become unreliable signals after repeated
 state model (not introduced by the live provider), documented here rather than fixed,
 since a real fix means deciding whether `more_research` means "augment" or "replace"
 state — a design decision that touches the accumulation model shared by both providers.
+
+### Memory management
+
+`research_system/memory/` implements LangGraph's standard short-term/long-term
+memory split, end to end:
+
+- **Short-term (thread-scoped)** — the existing checkpointer (`InMemorySaver` by
+  default in `build_graph()`) already provides this. `config.py`'s
+  `build_default_graph()` upgrades it to a `SqliteSaver` pointed at
+  `.research_memory/checkpoints.sqlite` when `langgraph-checkpoint-sqlite` is
+  installed, so a HITL-paused thread survives quitting and restarting the CLI.
+- **Semantic long-term memory** (`memory/semantic.py`) — durable facts about a
+  topic (`upsert_fact`/`relevant_facts`), namespaced `(topic, "semantic")` in a
+  real `langgraph.store.memory.InMemoryStore`.
+- **Episodic long-term memory** (`memory/episodic.py`) — a log of past runs on
+  a topic (`record_episode`/`recent_episodes`), namespaced `(topic, "episodic")`.
+- **Procedural long-term memory** (`memory/procedural.py`,
+  `memory/procedural_rules.json`) — a plain, git-versioned JSON file (not a
+  store entry), holding quality-gate thresholds and per-topic
+  `mandatory_human_review` overrides. Ships with defaults that exactly match
+  `quality.py`'s original hardcoded constants. "Versioning/rollback" is this
+  repo's own git history — `git checkout <rev> -- research_system/memory/procedural_rules.json`
+  to roll back, git tags/branches to distinguish versions.
+
+The store is threaded through explicitly (`build_graph(store=...)` →
+`build_planner_node(store)` → `state["memory_context"]` → `specialist_node` →
+`provider.research(..., memory=...)`), matching this codebase's existing
+factory/closure dependency-injection pattern (`specialist_node`,
+`build_cross_agent_insights(llm=None)`) rather than LangGraph's implicit
+`get_store()`.
+
+**The management loop**, per `research_system/memory/reflect.py`:
+1. **Capture** — already existed (`telemetry` state + optional LangSmith
+   tracing); `run_demo.py`/`run_eval.py` additionally call
+   `episodic.record_episode()` after every completed run.
+2. **Analyze and refine** — `reflect.reflect_on_topic()`, pure deterministic
+   Python pattern analysis (no LLM, on either provider path, in this
+   iteration): upserts a semantic fact when a failure pattern recurs across
+   ≥2 recent episodes for a topic, and *proposes* (never auto-applies) forcing
+   `mandatory_human_review` for a topic when the same failure recurs across
+   all of the last 3 episodes.
+3. **Store and version** — `store.persist_store()` writes the long-term
+   memory store to `.research_memory/store.json` (gitignored, same treatment
+   as `.env`) after every run; procedural rule changes go through
+   `run_demo.py`'s approve/reject prompt before
+   `procedural.apply_mandatory_review_override()` writes them to the
+   committed `procedural_rules.json`.
+4. **Apply and consolidate** — `build_planner_node()` reads relevant semantic
+   facts + episodes back into `state["memory_context"]` on every new run;
+   `DemoResearchProvider` surfaces them as a "Related memory: ..." note (demo
+   evidence itself can't change, so this is how the mechanism stays visible
+   offline); `LiveResearchProvider` folds them into the DeepSeek prompt, where
+   they can genuinely influence research; `quality_gate_node` reads
+   procedural thresholds via `load_rules()`.
+
+`run_eval.py`'s default (non-`--live`) path exercises `record_episode`/
+`reflect_on_topic` in-process but does **not** persist to disk, so it stays a
+deterministic, repeatable baseline measurement across separate invocations;
+pass `--live` to accumulate real persisted memory.
