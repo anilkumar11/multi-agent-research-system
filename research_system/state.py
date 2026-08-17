@@ -94,6 +94,7 @@ class ExecutionPlan(TypedDict):
 class ResearchState(TypedDict, total=False):
     question: str
     execution_plan: ExecutionPlan
+    memory_context: dict
 
     # reducer-backed lists allow safe aggregation from parallel branches
     evidence: Annotated[list[Evidence], operator.add]

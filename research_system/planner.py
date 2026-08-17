@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from .memory.episodic import recent_episodes
+from .memory.semantic import relevant_facts
+from .memory.topic import derive_topic
+
 ALL_SPECIALTIES = ("web_research", "data_analysis", "trend_analysis", "competitive_intelligence")
 
 # web_research and data_analysis are foundational (baseline sourcing + quantitative
@@ -95,12 +99,28 @@ def choose_execution_plan(question: str) -> dict:
     }
 
 
-def planner_node(state: dict) -> dict:
-    plan = choose_execution_plan(state["question"])
-    # breadth_score is explanatory only; keep state schema compact.
-    plan.pop("breadth_score", None)
-    return {
-        "execution_plan": plan,
-        "iteration_count": state.get("iteration_count", 0),
-        "_telemetry_note": plan["rationale"],
-    }
+def build_planner_node(store=None):
+    """
+    Factory producing the planner node, matching the same explicit-dependency-
+    injection pattern already used by specialist_node/build_cross_agent_insights/
+    detect_and_resolve_conflicts. With store=None, memory_context is always
+    empty (safe default for callers/tests that don't care about memory).
+    """
+    def planner_node(state: dict) -> dict:
+        plan = choose_execution_plan(state["question"])
+        # breadth_score is explanatory only; keep state schema compact.
+        plan.pop("breadth_score", None)
+
+        topic = derive_topic(state["question"])
+        memory_context = {"topic": topic, "semantic_facts": [], "relevant_episodes": []}
+        if store is not None:
+            memory_context["semantic_facts"] = relevant_facts(store, topic)
+            memory_context["relevant_episodes"] = recent_episodes(store, topic, limit=3)
+
+        return {
+            "execution_plan": plan,
+            "memory_context": memory_context,
+            "iteration_count": state.get("iteration_count", 0),
+            "_telemetry_note": plan["rationale"],
+        }
+    return planner_node

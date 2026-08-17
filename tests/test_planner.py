@@ -1,6 +1,6 @@
 import unittest
 
-from research_system.planner import choose_active_agents, choose_execution_plan
+from research_system.planner import build_planner_node, choose_active_agents, choose_execution_plan
 
 ALL_FOUR = {"web_research", "data_analysis", "trend_analysis", "competitive_intelligence"}
 
@@ -52,6 +52,41 @@ class ActiveAgentSelectionTests(unittest.TestCase):
         )
         self.assertIn("web_research", active)
         self.assertIn("data_analysis", active)
+
+
+class BuildPlannerNodeTests(unittest.TestCase):
+    def test_memory_context_empty_without_store(self):
+        node = build_planner_node()  # store=None
+        state = {"question": "Quick overview and landscape scan of the Indian EV market"}
+        result = node(state)
+        self.assertEqual(result["memory_context"]["semantic_facts"], [])
+        self.assertEqual(result["memory_context"]["relevant_episodes"], [])
+        self.assertEqual(result["memory_context"]["topic"], "ev_indian_market")
+
+    def test_memory_context_populated_from_store(self):
+        from langgraph.store.memory import InMemoryStore
+
+        from research_system.memory.episodic import record_episode
+        from research_system.memory.semantic import upsert_fact
+
+        store = InMemoryStore()
+        topic = "ev_indian_market"
+        upsert_fact(store, topic, "gate_failure:x", {"pattern": "recurring_gate_failure", "reason": "x"})
+        record_episode(store, topic, {"question": "prior question", "mode": "parallel"})
+
+        node = build_planner_node(store)
+        state = {"question": "Quick overview and landscape scan of the Indian EV market"}
+        result = node(state)
+
+        self.assertEqual(len(result["memory_context"]["semantic_facts"]), 1)
+        self.assertEqual(len(result["memory_context"]["relevant_episodes"]), 1)
+
+    def test_still_returns_execution_plan_and_iteration_count(self):
+        node = build_planner_node()
+        state = {"question": "Quick overview of the Indian EV market", "iteration_count": 2}
+        result = node(state)
+        self.assertEqual(result["execution_plan"]["mode"], "parallel")
+        self.assertEqual(result["iteration_count"], 2)
 
 
 if __name__ == "__main__":
