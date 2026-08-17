@@ -1,0 +1,9 @@
+{
+  "quality_gate": {
+    "min_evidence": 4,
+    "min_source_types": 2,
+    "min_avg_confidence": 0.70,
+    "min_cross_agent_insights": 1
+  },
+  "mandatory_human_review_topics": {}
+}
