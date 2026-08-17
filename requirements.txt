@@ -4,3 +4,4 @@ langchain-deepseek>=0.1
 langchain-tavily>=0.2
 python-dotenv>=1.0
 pydantic>=2.7
+langgraph-checkpoint-sqlite>=2.0
