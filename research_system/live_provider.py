@@ -32,7 +32,9 @@ class LiveResearchProvider:
         self._llm = llm
         self._search = search or TavilySearch(max_results=results_per_query)
 
-    def research(self, specialty: str, question: str, context: list[dict]) -> dict:
+    def research(
+        self, specialty: str, question: str, context: list[dict], memory: dict | None = None
+    ) -> dict:
         if specialty not in SPECIALTY_ROLES:
             raise ValueError(f"Unknown specialty: {specialty}")
 
@@ -40,7 +42,7 @@ class LiveResearchProvider:
         allowed_urls = {r["url"] for r in results if "url" in r}
         parent_ids = [e["evidence_id"] for e in context[-3:]]
 
-        prompt = self._build_prompt(specialty, question, results, context)
+        prompt = self._build_prompt(specialty, question, results, context, memory)
         findings = self._llm.with_structured_output(SpecialistFindingsSchema).invoke(prompt)
 
         evidence = []
@@ -81,7 +83,12 @@ class LiveResearchProvider:
         return response.get("results", []) if isinstance(response, dict) else response
 
     def _build_prompt(
-        self, specialty: str, question: str, results: list[dict], context: list[dict]
+        self,
+        specialty: str,
+        question: str,
+        results: list[dict],
+        context: list[dict],
+        memory: dict | None = None,
     ) -> str:
         role = SPECIALTY_ROLES[specialty]
         results_block = "\n".join(
@@ -92,13 +99,31 @@ class LiveResearchProvider:
             f"- [{e['produced_by']}] {e['claim']} (evidence_id={e['evidence_id']})"
             for e in context
         ) or "(no prior evidence yet)"
+        memory_block = self._format_memory(memory)
         return (
             f"You are {role} on a multi-agent research team.\n\n"
             f"Research question: {question}\n\n"
             f"Live search results:\n{results_block}\n\n"
             f"Evidence already gathered by other specialists:\n{context_block}\n\n"
+            f"Relevant memory from prior research on this topic:\n{memory_block}\n\n"
             "Produce 2 to 4 evidence items strictly grounded in the search results above. "
             "Each evidence item's source_url MUST be copied exactly, character for "
             "character, from one of the search result URLs above -- never invent a URL "
             "or modify one. Also produce a one- or two-sentence summary of your findings."
         )
+
+    @staticmethod
+    def _format_memory(memory: dict | None) -> str:
+        if not memory:
+            return "(no relevant memory for this topic yet)"
+
+        lines = []
+        for fact in memory.get("semantic_facts") or []:
+            lines.append(f"- known pattern: {fact}")
+        for episode in memory.get("relevant_episodes") or []:
+            lines.append(
+                f"- prior run: mode={episode.get('mode')} "
+                f"gate_passed={episode.get('gate_passed')} "
+                f"question=\"{episode.get('question')}\""
+            )
+        return "\n".join(lines) if lines else "(no relevant memory for this topic yet)"
