@@ -33,6 +33,11 @@ python -m unittest discover -s tests -v
 # Run a single test file / test case
 python -m unittest tests.test_planner -v
 python -m unittest tests.test_planner.PlannerTests.test_hybrid_for_complex_general_question -v
+
+# Inspect accumulated long-term memory (read-only, never writes)
+python inspect_memory.py                              # list every topic on record + procedural rules
+python inspect_memory.py "Indian EV market"            # episodes + semantic facts for one topic
+python inspect_memory.py ev_indian_market --raw        # same, as raw JSON
 ```
 
 Without a `DEEPSEEK_API_KEY` in the environment, `run_demo.py` prints a notice and falls
