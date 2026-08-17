@@ -5,7 +5,16 @@ import uuid
 
 from langgraph.types import Command
 
-from research_system.config import build_default_graph
+from research_system.config import STORE_PATH, build_default_graph
+from research_system.hitl import latest_conflicts
+from research_system.memory.episodic import record_episode
+from research_system.memory.procedural import (
+    apply_mandatory_review_override,
+    is_mandatory_review_topic,
+)
+from research_system.memory.reflect import reflect_on_topic
+from research_system.memory.store import persist_store
+from research_system.memory.topic import derive_topic
 
 
 def initial_state(question: str) -> dict:
@@ -19,7 +28,7 @@ def initial_state(question: str) -> dict:
         "telemetry": [],
         "human_decisions": [],
         "iteration_count": 0,
-        "mandatory_human_review": False,
+        "mandatory_human_review": is_mandatory_review_topic(derive_topic(question)),
         "research_complete": False,
         "final_report": "",
     }
@@ -60,6 +69,7 @@ def run_one_question(graph, question: str) -> None:
 
     result = graph.invoke(initial_state(question), config=config)
 
+    needed_human_review = "__interrupt__" in result
     while "__interrupt__" in result:
         interrupt_obj = result["__interrupt__"][0]
         payload = interrupt_obj.value
@@ -101,6 +111,51 @@ def run_one_question(graph, question: str) -> None:
             f"{event['execution_mode']:<10} | "
             f"{event['note']}"
         )
+
+    _remember(graph, question, result, needed_human_review)
+
+
+def _remember(graph, question: str, result: dict, needed_human_review: bool) -> None:
+    """
+    Capture this run into long-term memory and reflect on the topic. Wrapped
+    in try/except: a memory-layer failure must never take down a run whose
+    report already printed successfully -- a deliberate exception to this
+    codebase's usual fail-loud rule, justified because memory bookkeeping
+    here cannot corrupt the research result that's already been delivered.
+    """
+    try:
+        topic = derive_topic(question)
+        gate = result.get("quality_gate", {})
+        conflicts = latest_conflicts(result.get("conflicts", []))
+        episode = {
+            "question": question,
+            "mode": result["execution_plan"]["mode"],
+            "active_agents": result["execution_plan"]["active_agents"],
+            "gate_passed": gate.get("passed", False),
+            "gate_failures": gate.get("failures", []),
+            "needed_human_review": needed_human_review,
+            "insight_count": gate.get("cross_agent_insight_count", 0),
+            "open_conflict_issues": [c["issue"] for c in conflicts if c["status"] == "open"],
+        }
+        record_episode(graph.store, topic, episode)
+        reflection = reflect_on_topic(graph.store, topic)
+        persist_store(graph.store, STORE_PATH)
+
+        if reflection["proposed_rule_change"]:
+            _handle_rule_proposal(reflection["proposed_rule_change"])
+    except Exception as exc:
+        print(f"\n(memory capture skipped due to an error: {exc})")
+
+
+def _handle_rule_proposal(proposal: dict) -> None:
+    print("\n=== MEMORY: PROCEDURAL RULE PROPOSED ===")
+    print(json.dumps(proposal, indent=2))
+    answer = input("Apply this rule change? [y/N]: ").strip().lower()
+    if answer == "y":
+        apply_mandatory_review_override(proposal["topic"], proposal["rationale"])
+        print("Rule applied -- future runs on this topic will require human review by default.")
+    else:
+        print("Rule change discarded.")
 
 
 def main():

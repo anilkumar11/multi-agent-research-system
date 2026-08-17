@@ -7,8 +7,13 @@ import uuid
 
 from langgraph.types import Command
 
-from research_system.config import build_default_graph
+from research_system.config import STORE_PATH, build_default_graph
 from research_system.graph import build_graph
+from research_system.hitl import latest_conflicts
+from research_system.memory.episodic import record_episode
+from research_system.memory.reflect import reflect_on_topic
+from research_system.memory.store import persist_store
+from research_system.memory.topic import derive_topic
 from run_demo import initial_state
 
 # Verified against the offline demo provider: any question that leaves trend_analysis
@@ -27,7 +32,7 @@ DEFAULT_QUESTIONS = [
 ]
 
 
-def run_eval_question(graph, question: str) -> dict:
+def run_eval_question(graph, question: str, persist: bool) -> dict:
     thread_id = f"eval-{uuid.uuid4()}"
     config = {"configurable": {"thread_id": thread_id}}
 
@@ -50,6 +55,33 @@ def run_eval_question(graph, question: str) -> dict:
     elapsed_ms = (time.perf_counter() - start) * 1000
     gate = result.get("quality_gate", {})
 
+    proposed_rule_change = None
+    try:
+        topic = derive_topic(question)
+        conflicts = latest_conflicts(result.get("conflicts", []))
+        episode = {
+            "question": question,
+            "mode": result["execution_plan"]["mode"],
+            "active_agents": result["execution_plan"]["active_agents"],
+            "gate_passed": gate.get("passed", False),
+            "gate_failures": gate.get("failures", []),
+            "needed_human_review": needed_human_review,
+            "insight_count": gate.get("cross_agent_insight_count", 0),
+            "open_conflict_issues": [c["issue"] for c in conflicts if c["status"] == "open"],
+        }
+        record_episode(graph.store, topic, episode)
+        reflection = reflect_on_topic(graph.store, topic)
+        # Only the --live path persists memory to disk: the default offline path
+        # is meant to stay a deterministic, repeatable baseline measurement, and
+        # accumulating persisted memory across eval runs would undermine that.
+        # record_episode/reflect_on_topic still run either way, in-process, so
+        # the mechanism is exercised even when nothing is written to disk.
+        if persist:
+            persist_store(graph.store, STORE_PATH)
+        proposed_rule_change = reflection["proposed_rule_change"]
+    except Exception as exc:
+        print(f"    (memory capture skipped due to an error: {exc})")
+
     return {
         "question": question,
         "mode": result["execution_plan"]["mode"],
@@ -61,6 +93,7 @@ def run_eval_question(graph, question: str) -> dict:
         "cross_agent_insight_count": gate.get("cross_agent_insight_count", 0),
         "elapsed_ms": round(elapsed_ms, 1),
         "has_report": bool(result.get("final_report")),
+        "proposed_rule_change": proposed_rule_change,
     }
 
 
@@ -80,7 +113,7 @@ def main():
     results = []
     for i, question in enumerate(questions, 1):
         print(f"[{i}/{len(questions)}] {question[:70]}")
-        r = run_eval_question(graph, question)
+        r = run_eval_question(graph, question, persist=live)
         results.append(r)
         status = "PASS" if r["gate_passed_autonomously"] else ("HITL" if r["needed_human_review"] else "FAIL")
         print(
@@ -97,6 +130,15 @@ def main():
     print(f"Autonomous quality-gate pass rate: {autonomous_passes}/{total} ({rate:.0f}%)")
     print(f"Needed human review: {sum(1 for r in results if r['needed_human_review'])}/{total}")
     print(f"Average latency: {avg_latency:.0f} ms")
+
+    proposals = [r for r in results if r.get("proposed_rule_change")]
+    if proposals:
+        print(
+            f"\n{len(proposals)} procedural rule change(s) proposed by memory reflection "
+            "(not applied -- review via `python run_demo.py`):"
+        )
+        for r in proposals:
+            print(f"  - {r['proposed_rule_change']}")
 
     print("\n=== PER-QUESTION DETAIL ===")
     print(json.dumps(results, indent=2))
