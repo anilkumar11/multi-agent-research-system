@@ -54,5 +54,15 @@ class DurableCheckpointerTests(unittest.TestCase):
             self.assertTrue(os.path.exists(checkpoint_path))
 
 
+class BuildGraphStoreTests(unittest.TestCase):
+    def test_compiled_graph_exposes_the_store_it_was_built_with(self):
+        from langgraph.store.memory import InMemoryStore
+        from research_system.graph import build_graph
+
+        store = InMemoryStore()
+        graph = build_graph(store=store)
+        self.assertIs(graph.store, store)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -47,5 +47,7 @@ def persist_store(store: InMemoryStore, path: str) -> None:
     directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
-    with open(path, "w") as f:
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w") as f:
         json.dump(records, f, indent=2)
+    os.replace(tmp_path, path)

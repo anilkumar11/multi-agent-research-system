@@ -114,8 +114,11 @@ def build_planner_node(store=None):
         topic = derive_topic(state["question"])
         memory_context = {"topic": topic, "semantic_facts": [], "relevant_episodes": []}
         if store is not None:
-            memory_context["semantic_facts"] = relevant_facts(store, topic)
-            memory_context["relevant_episodes"] = recent_episodes(store, topic, limit=3)
+            try:
+                memory_context["semantic_facts"] = relevant_facts(store, topic)
+                memory_context["relevant_episodes"] = recent_episodes(store, topic, limit=3)
+            except Exception as exc:
+                print(f"Warning: could not read long-term memory for topic '{topic}' ({exc}); continuing without it.")
 
         return {
             "execution_plan": plan,

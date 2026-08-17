@@ -58,6 +58,8 @@ stand-in for what a human analyst would decide in a real UI. After a question's 
 prints, the CLI loops back to prompt for another question (each question is an independent
 research session/thread — there is no cross-question conversational memory).
 
+After a report prints, `run_demo.py` may also show a second, separate `[y/N]` prompt ("Apply this rule change?") if the memory subsystem's reflection step proposes forcing mandatory human review for that topic going forward — this is a distinct prompt from the `approve`/`more`/`resolve` HITL one above and only appears occasionally, not on every run.
+
 ## Architecture
 
 Everything is a LangGraph `StateGraph` over a single shared `ResearchState` (`research_system/state.py`). List-valued fields (`evidence`, `contributions`, `cross_agent_insights`, `conflicts`, `synthesis_threads`, `telemetry`, `human_decisions`) use `Annotated[..., operator.add]` reducers so parallel branches can append to shared state concurrently without clobbering each other.
@@ -167,3 +169,5 @@ factory/closure dependency-injection pattern (`specialist_node`,
 `reflect_on_topic` in-process but does **not** persist to disk, so it stays a
 deterministic, repeatable baseline measurement across separate invocations;
 pass `--live` to accumulate real persisted memory.
+
+**Known limitation:** `research_system/memory/store.py`'s `MAX_RECORDS = 10_000` bounds every bulk read of the long-term store — past that many records for a single namespace, `persist_store`/`recent_episodes`/`relevant_facts` silently stop seeing older ones, with no error. Fine for a demo system where a topic accumulates at most a handful of episodes per session, documented here rather than fixed, same as the `more_research` accumulation note above.

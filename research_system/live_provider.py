@@ -119,7 +119,15 @@ class LiveResearchProvider:
 
         lines = []
         for fact in memory.get("semantic_facts") or []:
-            lines.append(f"- known pattern: {fact}")
+            pattern = fact.get("pattern", "fact") if isinstance(fact, dict) else str(fact)
+            detail = fact.get("reason") or fact.get("issue") if isinstance(fact, dict) else None
+            occurrences = fact.get("occurrences") if isinstance(fact, dict) else None
+            summary = f"- known pattern: {pattern}"
+            if detail:
+                summary += f" ({detail})"
+            if occurrences:
+                summary += f", seen {occurrences}x"
+            lines.append(summary)
         for episode in memory.get("relevant_episodes") or []:
             lines.append(
                 f"- prior run: mode={episode.get('mode')} "

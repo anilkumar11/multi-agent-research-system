@@ -33,7 +33,8 @@ def load_rules(path: str = DEFAULT_PATH) -> dict:
     try:
         with open(path, "r") as f:
             rules = json.load(f)
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"Warning: could not read procedural rules at {path} ({exc}); using defaults.")
         return _deep_copy_defaults()
 
     merged = _deep_copy_defaults()
@@ -50,8 +51,10 @@ def apply_mandatory_review_override(topic: str, rationale: str, path: str = DEFA
     directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
-    with open(path, "w") as f:
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w") as f:
         json.dump(rules, f, indent=2)
+    os.replace(tmp_path, path)
 
 
 def is_mandatory_review_topic(topic: str, path: str = DEFAULT_PATH) -> bool:

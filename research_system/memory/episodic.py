@@ -16,5 +16,5 @@ def record_episode(store, topic: str, episode: dict) -> None:
 def recent_episodes(store, topic: str, limit: int = 5) -> list[dict]:
     """Return up to `limit` most recent episodes for a topic, newest first."""
     items = store.search((topic, "episodic"), limit=MAX_RECORDS)
-    ordered = sorted(items, key=lambda item: item.value["recorded_at"], reverse=True)
+    ordered = sorted(items, key=lambda item: (item.value["recorded_at"], item.key), reverse=True)
     return [item.value for item in ordered[:limit]]

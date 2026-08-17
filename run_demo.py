@@ -141,7 +141,7 @@ def _remember(graph, question: str, result: dict, needed_human_review: bool) -> 
         reflection = reflect_on_topic(graph.store, topic)
         persist_store(graph.store, STORE_PATH)
 
-        if reflection["proposed_rule_change"]:
+        if reflection["proposed_rule_change"] and not is_mandatory_review_topic(topic):
             _handle_rule_proposal(reflection["proposed_rule_change"])
     except Exception as exc:
         print(f"\n(memory capture skipped due to an error: {exc})")
